@@ -790,6 +790,18 @@
               <button onclick="bulkReplace()">🔄 Replace All</button>
             </div>
 
+            <div
+              id="bulkStatus"
+              style="
+                display: none;
+                margin: 10px 0;
+                padding: 10px 12px;
+                border-radius: 10px;
+                font-size: 14px;
+                font-weight: 600;
+              "
+            ></div>
+
             <div class="table-wrapper">
               <table id="tabelBarang"></table>
             </div>
@@ -974,11 +986,63 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
-          return await res.json();
+
+          const text = await res.text();
+          console.log(`[API ${action}] status=${res.status}`, text);
+
+          if (!text) {
+            return { success: false, message: "Empty server response." };
+          }
+
+          if (res.status >= 400) {
+            return {
+              success: false,
+              message: `HTTP ${res.status}: ${text}`,
+            };
+          }
+
+          try {
+            return JSON.parse(text);
+          } catch (error) {
+            console.error("API Response Parse Error:", error, text);
+            return {
+              success: false,
+              message: `Server returned an invalid response: ${text}`,
+            };
+          }
         } catch (error) {
           console.error("API Call Error:", error);
-          throw error;
+          return {
+            success: false,
+            message: "Server offline or connection failed.",
+          };
         }
+      }
+
+      function setBulkStatus(message, type = "info") {
+        const el = document.getElementById("bulkStatus");
+        if (!el) return;
+
+        el.style.display = "block";
+        el.textContent = message;
+        el.style.background =
+          type === "success"
+            ? "#dcfce7"
+            : type === "error"
+              ? "#fee2e2"
+              : "#e0f2fe";
+        el.style.color =
+          type === "success"
+            ? "#166534"
+            : type === "error"
+              ? "#991b1b"
+              : "#0f172a";
+        el.style.border =
+          type === "success"
+            ? "1px solid #86efac"
+            : type === "error"
+              ? "1px solid #fca5a5"
+              : "1px solid #7dd3fc";
       }
 
       let user = "";
@@ -1345,20 +1409,63 @@
         const replaceText = document.getElementById("replaceText").value.trim();
 
         if (!findText) {
+          setBulkStatus("Please enter the text to find.", "error");
           showError("Please enter the text to find.");
           return;
         }
 
+        if (findText.toLowerCase() === replaceText.toLowerCase()) {
+          setBulkStatus(
+            "Find and Replace text cannot be the same, even if the capitalization differs.",
+            "error",
+          );
+          showError(
+            "Find and Replace text cannot be the same, even if the capitalization differs.",
+          );
+          return;
+        }
+
+        let matchCount = 0;
+        for (let i = 1; i < globalData.length; i++) {
+          const row = globalData[i];
+          for (let j = 0; j < 6; j++) {
+            if (String(row[j]).toLowerCase().includes(findText.toLowerCase())) {
+              matchCount++;
+              break;
+            }
+          }
+        }
+
+        if (matchCount === 0) {
+          const msg = `No matching records were found for "${findText}" in the current inventory data.`;
+          setBulkStatus(msg, "error");
+          showError(msg);
+          return;
+        }
+
+        const confirmed = window.confirm(
+          `Preview: this will update ${matchCount} matching record(s).\n\nFind: ${findText}\nReplace with: ${replaceText}\n\nContinue with mass replace?`,
+        );
+
+        if (!confirmed) {
+          setBulkStatus("Mass replace cancelled by user.", "info");
+          return;
+        }
+
+        setBulkStatus("Processing bulk replace...", "info");
+
         const res = await apiCall("bulkReplace", { findText, replaceText });
         if (res.success) {
-          alert(
-            `✅ Mass update completed. (${res.totalUpdate} entries updated)`,
-          );
+          const msg = `✅ Mass update completed. (${res.totalUpdate} entries updated)`;
+          setBulkStatus(msg, "success");
+          alert(msg);
           document.getElementById("findText").value = "";
           document.getElementById("replaceText").value = "";
           loadData();
         } else {
-          showError(res.message);
+          const msg = res.message || "Bulk replace failed.";
+          setBulkStatus(msg, "error");
+          showError(msg);
         }
       }
 

@@ -218,24 +218,39 @@ switch ($action) {
             exit;
         }
 
+        if (strtolower($findText) === strtolower($replaceText)) {
+            echo json_encode(['success' => false, 'message' => 'Teks cari dan pengganti tidak boleh sama, baik huruf besar/kecilnya.']);
+            exit;
+        }
+
         $stmt = $pdo->prepare("
             UPDATE barang 
             SET 
-                kotak = REPLACE(kotak, :find, :replace),
-                nama = REPLACE(nama, :find, :replace),
-                pic = REPLACE(pic, :find, :replace),
-                lokasi = REPLACE(lokasi, :find, :replace)
+                kotak = REPLACE(kotak, ?, ?),
+                nama = REPLACE(nama, ?, ?),
+                pic = REPLACE(pic, ?, ?),
+                lokasi = REPLACE(lokasi, ?, ?)
             WHERE 
-                kotak LIKE :find_like OR 
-                nama LIKE :find_like OR 
-                pic LIKE :find_like OR 
-                lokasi LIKE :find_like
+                kotak LIKE ? OR 
+                nama LIKE ? OR 
+                pic LIKE ? OR 
+                lokasi LIKE ?
         ");
 
+        $likeText = '%' . $findText . '%';
         $stmt->execute([
-            ':find' => $findText,
-            ':replace' => $replaceText,
-            ':find_like' => '%' . $findText . '%'
+            $findText,
+            $replaceText,
+            $findText,
+            $replaceText,
+            $findText,
+            $replaceText,
+            $findText,
+            $replaceText,
+            $likeText,
+            $likeText,
+            $likeText,
+            $likeText,
         ]);
 
         echo json_encode([
