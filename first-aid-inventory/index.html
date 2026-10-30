@@ -1,0 +1,1645 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>First Aid Inventory System - B. Braun</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Chart.js & Plugin DataLabels -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
+    <style>
+      html {
+        font-size: 18px;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Poppins", sans-serif;
+        -webkit-text-size-adjust: 100%;
+        background-color: #f8fafc;
+      }
+
+      #loginPage {
+        height: 100vh;
+        background: linear-gradient(135deg, #0f2027, #2c5364, #00c9a7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .login-box {
+        background: white;
+        padding: 35px 25px;
+        border-radius: 20px;
+        width: 320px;
+        text-align: center;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(10px);
+      }
+
+      .login-box h2 {
+        margin-bottom: 20px;
+        color: #2c3e50;
+      }
+
+      .login-box input {
+        width: 100%;
+        padding: 12px;
+        padding-right: 45px;
+        margin: 10px 0;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+        font-size: 15px;
+        transition: 0.2s;
+        box-sizing: border-box;
+      }
+
+      .login-box input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 5px rgba(102, 126, 234, 0.5);
+      }
+
+      .login-box button {
+        width: 100%;
+        padding: 12px;
+        margin-top: 10px;
+        background: linear-gradient(135deg, #00c9a7, #007a5a);
+        color: white;
+        font-size: 16px;
+        border-radius: 8px;
+        font-weight: bold;
+        border: none;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+
+      .login-box button:hover {
+        transform: scale(1.03);
+        opacity: 0.95;
+      }
+
+      #errorLogin {
+        display: none;
+        background: #fee2e2;
+        color: #dc2626;
+        padding: 12px;
+        margin-top: 12px;
+        border-radius: 10px;
+        border-left: 4px solid #dc2626;
+        font-size: 14px;
+        font-weight: 500;
+        text-align: left;
+      }
+
+      input {
+        width: 100%;
+        padding: 8px;
+        margin: 5px 0;
+        box-sizing: border-box;
+      }
+
+      button {
+        padding: 8px;
+        border: none;
+        cursor: pointer;
+        margin-top: 5px;
+      }
+
+      .sidebar {
+        width: 220px;
+        min-width: 220px;
+        background: linear-gradient(180deg, #1e293b, #0f172a);
+        color: white;
+        padding: 20px;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+      }
+
+      .sidebar h3 {
+        font-size: 13px;
+        letter-spacing: 3px;
+        color: #94a3b8;
+        margin-bottom: 25px;
+        font-weight: 600;
+      }
+
+      .sidebar button {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 10px;
+        background: rgba(255, 255, 255, 0.08);
+        color: white;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+        border-radius: 14px;
+        font-size: 15px;
+        font-weight: 600;
+        transition: 0.25s;
+        text-align: left;
+      }
+
+      .sidebar button:hover {
+        background: linear-gradient(135deg, #00c9a7, #007a5a);
+        transform: translateX(5px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+      }
+
+      .content {
+        flex: 1;
+        padding: 25px;
+        background: linear-gradient(135deg, #ecfdf5, #f0fdf4, #f8fafc);
+        max-width: 1100px;
+        margin: 0 auto;
+        width: 100%;
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        background: white;
+      }
+
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        text-align: center;
+      }
+
+      th {
+        background: linear-gradient(135deg, #00c9a7, #007a5a);
+        color: white;
+        font-size: 15px;
+        font-weight: 600;
+      }
+
+      .btn-plus {
+        background: #16a34a;
+        color: white;
+        border-radius: 6px;
+      }
+      .btn-minus {
+        background: #dc2626;
+        color: white;
+        border-radius: 6px;
+      }
+
+      .box {
+        background: white;
+        padding: 20px;
+        border-radius: 14px;
+        margin-top: 15px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+        transition: 0.2s;
+      }
+
+      .box:hover {
+        transform: translateY(-2px);
+      }
+
+      .title-dashboard {
+        text-align: center;
+        font-size: 26px;
+        font-weight: 700;
+        margin: 25px 0 20px;
+        color: #1e293b;
+        position: relative;
+      }
+
+      .title-dashboard::after {
+        content: "";
+        width: 80px;
+        height: 4px;
+        background: linear-gradient(135deg, #00a97a, #007a5a);
+        display: block;
+        margin: 10px auto 0;
+        border-radius: 5px;
+      }
+
+      .header-box {
+        background: linear-gradient(135deg, #00a97a, #007a5a);
+        color: white;
+        padding: 20px 25px;
+        border-radius: 18px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        margin-bottom: 20px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .header-box h2 {
+        margin: 0;
+        font-size: 26px;
+        font-weight: 600;
+      }
+
+      .header-box p {
+        margin-top: 5px;
+        opacity: 0.9;
+      }
+
+      .header-box::after {
+        content: "";
+        position: absolute;
+        right: -50px;
+        top: -50px;
+        width: 150px;
+        height: 150px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 50%;
+      }
+
+      .card-title {
+        font-size: 15px;
+        color: #475569;
+        margin-bottom: 12px;
+        font-weight: 600;
+      }
+
+      .stats {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 15px;
+      }
+
+      .stat-box {
+        flex: 1;
+        background: white;
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        text-align: center;
+        font-size: 14px;
+        color: #64748b;
+      }
+
+      .stat-box b {
+        font-size: 22px;
+        display: block;
+        margin-top: 5px;
+        color: #0f172a;
+      }
+
+      #app {
+        display: none;
+      }
+
+      .eye-btn {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 20px;
+        cursor: pointer;
+        opacity: 0.6;
+        transition: 0.2s;
+        user-select: none;
+      }
+
+      .eye-btn:hover {
+        opacity: 1;
+      }
+
+      .title-login {
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        margin-bottom: 5px;
+      }
+
+      .sub-login {
+        font-size: 16px;
+        font-weight: 700;
+        color: #009c7f;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        margin-top: 5px;
+      }
+
+      .braun-logo {
+        display: inline-flex;
+        align-items: center;
+        font-size: 16px;
+        font-weight: 700;
+        color: #009c7f;
+        letter-spacing: 1px;
+      }
+
+      .braun-logo .b {
+        position: relative;
+        padding-right: 8px;
+        margin-right: 8px;
+      }
+
+      .braun-logo .b::after {
+        content: "";
+        position: absolute;
+        right: 0;
+        top: 0;
+        height: 100%;
+        width: 2px;
+        background: #009c7f;
+      }
+
+      .action-wrap-admin {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 4px;
+      }
+
+      .action-wrap-user {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .action-wrap-user button {
+        width: 100%;
+        height: 55px;
+        font-size: 26px;
+        font-weight: bold;
+      }
+
+      .action-wrap-admin button {
+        height: 38px;
+        font-size: 15px;
+      }
+
+      .chart-scroll {
+        height: 220px;
+        overflow-y: auto;
+        overflow-x: auto;
+      }
+
+      .btn-save {
+        width: 100%;
+        padding: 14px;
+        background: linear-gradient(135deg, #00c9a7, #007a5a);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 600;
+        margin-top: 10px;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+
+      .btn-save:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px rgba(0, 169, 122, 0.3);
+      }
+
+      #filterNama,
+      #filterLokasi {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #dbe2ea;
+        border-radius: 12px;
+        padding: 14px 18px;
+        background: white;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+        margin-bottom: 10px;
+        transition: 0.2s;
+      }
+
+      #filterNama:focus,
+      #filterLokasi:focus {
+        outline: none;
+        border-color: #00a97a;
+        box-shadow: 0 0 0 3px rgba(0, 169, 122, 0.15);
+      }
+
+      #tabelBarang tr:hover td {
+        background: #f0fdf4;
+        transition: 0.2s;
+      }
+
+      .qty-title {
+        text-align: center;
+        font-size: 24px;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0 0 20px;
+        position: relative;
+      }
+
+      .qty-title::after {
+        content: "";
+        display: block;
+        width: 60px;
+        height: 3px;
+        margin: 10px auto 0;
+        border-radius: 20px;
+        background: linear-gradient(135deg, #00c9a7, #007a5a);
+      }
+
+      .btn-save-modal {
+        flex: 1;
+        background: linear-gradient(135deg, #00c9a7, #007a5a);
+        color: white;
+        border-radius: 12px;
+        padding: 12px;
+        font-weight: 600;
+        transition: 0.2s;
+      }
+
+      .btn-cancel {
+        flex: 1;
+        background: #e2e8f0;
+        color: #334155;
+        border-radius: 12px;
+        padding: 12px;
+        font-weight: 600;
+      }
+
+      .modal-content {
+        background: white;
+        width: 380px;
+        max-width: 90%;
+        padding: 28px;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+      }
+
+      #qtyInput,
+      #modalEdit input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 12px;
+        border: 1px solid #dbe2ea;
+        border-radius: 10px;
+        font-size: 15px;
+        margin-bottom: 10px;
+      }
+
+      #qtyInput:focus,
+      #modalEdit input:focus {
+        outline: none;
+        border-color: #00a97a;
+        box-shadow: 0 0 0 3px rgba(0, 169, 122, 0.15);
+      }
+
+      .first-aid-cross {
+        color: #ff0000;
+        font-size: 38px;
+        font-weight: bold;
+        vertical-align: middle;
+        margin-right: 6px;
+      }
+
+      .sidebar-user {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 25px;
+      }
+
+      .avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #00c9a7, #007a5a);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+      }
+
+      .user-name {
+        font-size: 15px;
+        font-weight: 700;
+        color: white;
+      }
+
+      .user-role {
+        font-size: 12px;
+        color: #94a3b8;
+      }
+
+      .btn-export {
+        height: 42px;
+        padding: 0 16px;
+        background: #16a34a;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .btn-export:hover {
+        background: #15803d;
+      }
+
+      .table-wrapper {
+        max-height: 520px;
+        overflow-y: auto;
+        overflow-x: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        background: white;
+        margin-top: 10px;
+      }
+
+      .sticky-header th {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: linear-gradient(135deg, #00c9a7, #007a5a);
+        color: white;
+      }
+
+      .bulk-box {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+      }
+
+      .bulk-box input {
+        flex: 1;
+        border: 1px solid #dbe2ea;
+        border-radius: 10px;
+        padding: 12px;
+      }
+
+      .bulk-box button {
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        color: white;
+        border-radius: 10px;
+        padding: 0 18px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+      }
+
+      .dev-credit {
+        margin-top: 18px;
+        padding-top: 10px;
+        border-top: 1px solid #e5e7eb;
+        text-align: center;
+        font-size: 10px;
+        color: #94a3b8;
+        line-height: 1.6;
+      }
+
+      @media screen and (max-width: 768px) {
+        .sidebar {
+          width: 100%;
+          display: flex;
+          justify-content: space-around;
+          padding: 10px;
+        }
+        .sidebar h3,
+        .sidebar-user {
+          display: none;
+        }
+        .sidebar button {
+          font-size: 13px;
+          padding: 8px 10px;
+        }
+        .content {
+          padding: 12px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- LOGIN PAGE -->
+    <div id="loginPage">
+      <div class="login-box">
+        <h2 class="title-login">
+          <span class="first-aid-cross">✚</span> First Aid Inventory
+        </h2>
+        <p class="sub-login">
+          <span class="braun-logo"><span class="b">B</span>BRAUN</span>
+        </p>
+
+        <input id="username" placeholder="Username" autocomplete="username" />
+
+        <div style="position: relative; width: 100%">
+          <input
+            id="password"
+            type="password"
+            placeholder="Password"
+            autocomplete="current-password"
+            style="padding-right: 45px"
+          />
+          <span id="eyeBtn" class="eye-btn">👁</span>
+        </div>
+
+        <div
+          class="g-recaptcha"
+          data-sitekey="6LeFkgcuAAAAAAbC0TDIY52o8PHaDaD72Jmd6mWF"
+        ></div>
+
+        <div id="errorLogin">
+          ❌ Login failed. Please check your username and password.
+        </div>
+
+        <button onclick="login()">Login</button>
+
+        <div class="dev-credit">
+          First Aid Inventory System v1.0<br />
+          Developed by Dionesius Situngkir | EHSS & SM Intern
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN APPLICATION -->
+    <div id="app">
+      <div style="display: flex; min-height: 100vh">
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+          <div class="sidebar-user">
+            <div class="avatar">👩🏻</div>
+            <div class="user-info">
+              <div class="user-name" id="userSidebar">User</div>
+              <div class="user-role">First Aid Team</div>
+            </div>
+          </div>
+
+          <h3>NAVIGATION</h3>
+          <button id="btnDashboard" onclick="showPage('home')">
+            📊 Dashboard
+          </button>
+          <button onclick="showPage('input')">📦 First Aid Input</button>
+          <button onclick="logout()">🚪 Logout</button>
+        </div>
+
+        <!-- CONTENT -->
+        <div class="content">
+          <!-- DASHBOARD PAGE -->
+          <div id="home">
+            <div class="header-box">
+              <h2>👋 Hello, <span id="namaUser"></span></h2>
+              <p>Welcome to First Aid Dashboard</p>
+            </div>
+
+            <h3 class="title-dashboard">First Aid Dashboard</h3>
+
+            <div class="stats">
+              <div class="stat-box">
+                📦 Inventory Items<br /><b id="totalItem">-</b>
+              </div>
+              <div class="stat-box">
+                ⚠️ Low Stock Items<br /><b id="lowStock">-</b>
+              </div>
+              <div class="stat-box">
+                📍 Locations<br /><b id="totalLoc">-</b>
+              </div>
+            </div>
+
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin: 15px 0;
+                flex-wrap: wrap;
+                gap: 10px;
+              "
+            >
+              <select
+                id="filterLokasiChart"
+                onchange="updateDashboard()"
+                style="
+                  padding: 10px 14px;
+                  border-radius: 8px;
+                  border: 1px solid #dbe2ea;
+                "
+              >
+                <option value="all">All Locations</option>
+              </select>
+              <button onclick="downloadLowStockExcel()" class="btn-export">
+                📥 Download Low Stock Report
+              </button>
+            </div>
+
+            <!-- CHARTS -->
+            <div
+              style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 15px;
+              "
+            >
+              <div class="box">
+                <div class="card-title">🚨 Low Stock Alert</div>
+                <div class="chart-scroll">
+                  <canvas id="chartHabis"></canvas>
+                </div>
+              </div>
+
+              <div class="box">
+                <div class="card-title">📦 Stock by Location</div>
+                <div class="chart-scroll">
+                  <canvas id="chartLokasi"></canvas>
+                </div>
+              </div>
+
+              <div class="box">
+                <div class="card-title">🧰 Item Details</div>
+                <div class="chart-scroll">
+                  <canvas id="chartKotak"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- INVENTORY INPUT PAGE -->
+          <div id="input" style="display: none">
+            <h2
+              style="
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-top: 0;
+              "
+            >
+              <span style="color: #ff0000; font-size: 42px; font-weight: bold"
+                >✚</span
+              >
+              First Aid Inventory
+            </h2>
+
+            <input
+              id="filterNama"
+              placeholder="🔍 Search PIC..."
+              onkeyup="filterData()"
+            />
+            <input
+              id="filterLokasi"
+              placeholder="🔍 Search location..."
+              onkeyup="filterData()"
+            />
+
+            <div class="bulk-box" id="bulkReplaceBox">
+              <input id="findText" placeholder="Find..." />
+              <input id="replaceText" placeholder="Replace with..." />
+              <button onclick="bulkReplace()">🔄 Replace All</button>
+            </div>
+
+            <div class="table-wrapper">
+              <table id="tabelBarang"></table>
+            </div>
+
+            <div class="box">
+              <h3 style="margin-top: 0; color: #1e293b">
+                📦 Add New Inventory Item
+              </h3>
+              <input id="newKotak" placeholder="Box Number" />
+              <input id="newNama" placeholder="Item Name" />
+              <input id="newStok" type="number" placeholder="Current Stock" />
+              <input id="newPic" placeholder="PIC" />
+              <input id="newLokasi" placeholder="Location" />
+              <button class="btn-save" onclick="tambahBarangBaru()">
+                💾 Save Inventory
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL QUANTITY (+ / -) -->
+    <div
+      id="modalQty"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.45);
+        justify-content: center;
+        align-items: center;
+        z-index: 99999;
+      "
+    >
+      <div class="modal-content">
+        <h3 class="qty-title">Enter Quantity</h3>
+        <input id="qtyInput" type="number" placeholder="Enter quantity" />
+        <div style="display: flex; gap: 12px; margin-top: 18px">
+          <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+          <button class="btn-save-modal" onclick="submitQty()">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL EDIT ITEM -->
+    <div
+      id="modalEdit"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.45);
+        justify-content: center;
+        align-items: center;
+        z-index: 99999;
+      "
+    >
+      <div class="modal-content">
+        <h3 class="qty-title">Edit Item</h3>
+        <input id="editKotak" placeholder="Box Number" />
+        <input id="editNama" placeholder="Item Name" />
+        <input id="editStok" type="number" placeholder="Current Stock" />
+        <input id="editPic" placeholder="PIC" />
+        <input id="editLokasi" placeholder="Location" />
+        <div style="display: flex; gap: 12px; margin-top: 18px">
+          <button class="btn-cancel" onclick="closeEditModal()">Cancel</button>
+          <button class="btn-save-modal" onclick="saveEditModal()">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL ERROR / VALIDATION -->
+    <div
+      id="errorModal"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(15, 23, 42, 0.7);
+        justify-content: center;
+        align-items: center;
+        z-index: 99999;
+      "
+    >
+      <div
+        style="
+          background: white;
+          width: 420px;
+          max-width: 90%;
+          padding: 30px;
+          border-radius: 20px;
+          text-align: center;
+          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+        "
+      >
+        <div style="font-size: 52px; color: #ef4444">⚠️</div>
+        <h2 style="margin: 10px 0">Validation Error</h2>
+        <p id="errorText" style="color: #64748b"></p>
+        <button
+          onclick="closeErrorModal()"
+          style="
+            margin-top: 20px;
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            background: #ef4444;
+            color: white;
+            font-weight: 600;
+          "
+        >
+          OK
+        </button>
+      </div>
+    </div>
+
+    <!-- MODAL DELETE CONFIRMATION -->
+    <div
+      id="deleteModal"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        justify-content: center;
+        align-items: center;
+        z-index: 99999;
+      "
+    >
+      <div
+        style="
+          background: white;
+          width: 420px;
+          max-width: 90%;
+          padding: 30px;
+          border-radius: 20px;
+          text-align: center;
+        "
+      >
+        <div style="font-size: 50px">🗑️</div>
+        <h2>Delete Item</h2>
+        <p>Are you sure you want to permanently delete this item?</p>
+        <div style="display: flex; gap: 12px; margin-top: 20px">
+          <button onclick="closeDeleteModal()" class="btn-cancel">
+            Cancel
+          </button>
+          <button
+            onclick="confirmDelete()"
+            style="
+              background: #ef4444;
+              color: white;
+              flex: 1;
+              border-radius: 12px;
+            "
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ==========================================
+      // 🚀 NATIVE API CLIENT (Menggantikan google.script.run)
+      // ==========================================
+      async function apiCall(action, payload = {}) {
+        try {
+          const res = await fetch(`api.php?action=${action}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          return await res.json();
+        } catch (error) {
+          console.error("API Call Error:", error);
+          throw error;
+        }
+      }
+
+      let user = "";
+      let role = "";
+      let currentIndex = null;
+      let currentAksi = "";
+      let editIndex = null;
+      let deleteIndex = null;
+      let globalData = [];
+      let chartLokasi, chartHabis, chartKotak;
+
+      // Modal Toggles
+      function openModal(index, aksi) {
+        currentIndex = index;
+        currentAksi = aksi;
+        document.getElementById("qtyInput").value = "";
+        document.getElementById("modalQty").style.display = "flex";
+      }
+      function closeModal() {
+        document.getElementById("modalQty").style.display = "none";
+      }
+      function closeEditModal() {
+        document.getElementById("modalEdit").style.display = "none";
+      }
+      function showError(message) {
+        document.getElementById("errorText").innerText = message;
+        document.getElementById("errorModal").style.display = "flex";
+      }
+      function closeErrorModal() {
+        document.getElementById("errorModal").style.display = "none";
+      }
+      function closeDeleteModal() {
+        document.getElementById("deleteModal").style.display = "none";
+      }
+
+      // ==========================================
+      // 🔐 AUTHENTICATION
+      // ==========================================
+      async function login() {
+        const u = document.getElementById("username").value.trim();
+        const p = document.getElementById("password").value.trim();
+        const captchaToken = window.grecaptcha?.getResponse();
+
+        document.getElementById("errorLogin").style.display = "none";
+
+        if (!captchaToken) {
+          document.getElementById("errorLogin").innerText =
+            "❌ Please complete the reCAPTCHA check.";
+          document.getElementById("errorLogin").style.display = "block";
+          return;
+        }
+
+        try {
+          const res = await apiCall("login", {
+            username: u,
+            password: p,
+            captchaToken,
+          });
+          if (res.success) {
+            user = u;
+            role = res.role.toString().trim().toLowerCase();
+
+            setupRoleUI(role);
+
+            localStorage.setItem("loginUser", u);
+            localStorage.setItem("role", role);
+
+            document.getElementById("loginPage").style.display = "none";
+            document.getElementById("app").style.display = "block";
+            document.getElementById("app").style.opacity = "1";
+
+            document.getElementById("namaUser").innerText = user;
+            document.getElementById("userSidebar").innerText = user;
+
+            loadData();
+
+            if (role === "user") {
+              showPage("input");
+            }
+          } else {
+            document.getElementById("errorLogin").innerText =
+              res.message ||
+              "❌ Login failed. Please check username & password.";
+            document.getElementById("errorLogin").style.display = "block";
+            window.grecaptcha?.reset();
+          }
+        } catch (e) {
+          document.getElementById("errorLogin").innerText =
+            "❌ Server offline or connection failed.";
+          document.getElementById("errorLogin").style.display = "block";
+          window.grecaptcha?.reset();
+        }
+      }
+
+      function setupRoleUI(currentRole) {
+        if (currentRole === "user") {
+          document.querySelector(".avatar").innerHTML = "👥";
+          document.querySelector(".user-role").innerText = "First Aid Team";
+          document.getElementById("bulkReplaceBox").style.display = "none";
+          document.getElementById("btnDashboard").style.display = "none";
+        } else {
+          document.querySelector(".avatar").innerHTML = "👩🏻";
+          document.querySelector(".user-role").innerText = "Administrator";
+          document.getElementById("bulkReplaceBox").style.display = "flex";
+          document.getElementById("btnDashboard").style.display = "block";
+        }
+      }
+
+      function logout() {
+        localStorage.removeItem("loginUser");
+        localStorage.removeItem("role");
+
+        document.getElementById("app").style.display = "none";
+        document.getElementById("loginPage").style.display = "flex";
+        document.getElementById("username").value = "";
+        document.getElementById("password").value = "";
+        document.getElementById("errorLogin").style.display = "none";
+      }
+
+      // ==========================================
+      // 📦 LOAD & RENDER DATA
+      // ==========================================
+      async function loadData() {
+        try {
+          const res = await apiCall("getBarang");
+          const data = res.data;
+
+          let html =
+            "<tr class='sticky-header'>" +
+            "<th>Item Name</th>" +
+            "<th>Standard Stock</th>" +
+            "<th>Current Stock</th>" +
+            "<th>PIC</th>" +
+            "<th>Box Number</th>" +
+            "<th>Location</th>" +
+            "<th>Action</th>" +
+            "</tr>";
+
+          for (let i = 1; i < data.length; i++) {
+            html += "<tr>";
+            html += "<td>" + data[i][1] + "</td>"; // Item Name
+            html += "<td>" + data[i][2] + "</td>"; // Standard Stock
+            html += "<td>" + data[i][3] + "</td>"; // Current Stock
+            html += "<td>" + data[i][4] + "</td>"; // PIC
+            html += "<td>" + data[i][0] + "</td>"; // Box Number
+            html += "<td>" + data[i][5] + "</td>"; // Location
+
+            html +=
+              "<td" +
+              (role === "user" ? " style='min-width:120px'" : "") +
+              "><div class='" +
+              (role === "user" ? "action-wrap-user" : "action-wrap-admin") +
+              "'>";
+            html +=
+              "<button class='btn-plus' onclick=\"openModal(" +
+              i +
+              ",'tambah')\">+</button>";
+            html +=
+              "<button class='btn-minus' onclick=\"openModal(" +
+              i +
+              ",'kurang')\">-</button>";
+
+            if (role !== "user") {
+              html +=
+                "<button style='background:#f1c40f;color:white;border-radius:6px;' onclick=\"editBaris(" +
+                i +
+                ')">✏️</button>';
+              html +=
+                "<button style='background:#e74c3c;color:white;border-radius:6px;' onclick=\"hapusBaris(" +
+                i +
+                ')">🗑</button>';
+            }
+
+            html += "</div></td>";
+            html += "</tr>";
+          }
+
+          document.getElementById("tabelBarang").innerHTML = html;
+
+          globalData = data;
+          loadFilter(data);
+          updateDashboard();
+          filterData();
+        } catch (e) {
+          console.error("Gagal memuat data barang:", e);
+        }
+      }
+
+      // ==========================================
+      // ✏️ UPDATE, TAMBAH, EDIT & HAPUS
+      // ==========================================
+      async function submitQty() {
+        let jumlah = document.getElementById("qtyInput").value;
+        if (!jumlah) return;
+
+        const id = globalData[currentIndex][6]; // Ambil primary key ID database
+
+        const res = await apiCall("updateStokByIndex", {
+          id: id,
+          jumlah: Number(jumlah),
+          aksi: currentAksi,
+          user: user,
+        });
+
+        if (res.success) {
+          alert(res.message);
+          closeModal();
+          loadData();
+        } else {
+          alert(res.message);
+        }
+      }
+
+      function editBaris(index) {
+        editIndex = index;
+        document.getElementById("editKotak").value = globalData[index][0];
+        document.getElementById("editNama").value = globalData[index][1];
+        document.getElementById("editStok").value = globalData[index][3];
+        document.getElementById("editPic").value = globalData[index][4];
+        document.getElementById("editLokasi").value = globalData[index][5];
+        document.getElementById("modalEdit").style.display = "flex";
+      }
+
+      async function saveEditModal() {
+        const id = globalData[editIndex][6];
+        const kotak = document.getElementById("editKotak").value.trim();
+        const nama = document.getElementById("editNama").value.trim();
+        const stok = document.getElementById("editStok").value.trim();
+        const pic = document.getElementById("editPic").value.trim();
+        const lokasi = document.getElementById("editLokasi").value.trim();
+
+        const res = await apiCall("editBarang", {
+          id: id,
+          kotak: kotak,
+          nama: nama,
+          stok: stok,
+          pic: pic,
+          lokasi: lokasi,
+        });
+
+        if (res.success) {
+          alert("✅ Data updated");
+          closeEditModal();
+          loadData();
+        } else {
+          showError(res.message);
+        }
+      }
+
+      function hapusBaris(index) {
+        deleteIndex = index;
+        document.getElementById("deleteModal").style.display = "flex";
+      }
+
+      async function confirmDelete() {
+        const id = globalData[deleteIndex][6];
+        const res = await apiCall("hapusBarang", { id: id });
+        if (res.success) {
+          closeDeleteModal();
+          loadData();
+        } else {
+          alert(res.message);
+        }
+      }
+
+      async function tambahBarangBaru() {
+        const kotak = document.getElementById("newKotak").value;
+        const nama = document.getElementById("newNama").value.toLowerCase();
+        const stok = document.getElementById("newStok").value;
+        const pic = document.getElementById("newPic").value;
+        const lokasi = document.getElementById("newLokasi").value.trim();
+        const lokasiCheck = lokasi.toLowerCase();
+
+        let standar = 0;
+
+        if (
+          kotak.trim() === "" ||
+          nama.trim() === "" ||
+          stok.trim() === "" ||
+          pic.trim() === "" ||
+          lokasi.trim() === ""
+        ) {
+          showError("Please complete all required fields before saving.");
+          return;
+        }
+
+        let found = false;
+        for (let i = 1; i < globalData.length; i++) {
+          let namaDB = globalData[i][1].toLowerCase();
+          let kotakDB = globalData[i][0];
+          let lokasiDB = globalData[i][5].toLowerCase();
+          let standarDB = Number(globalData[i][2]);
+          let picDB = globalData[i][4].trim();
+          let picCheck = pic.trim();
+
+          if (kotak === kotakDB && lokasiCheck !== lokasiDB) {
+            showError(
+              "This box has already been assigned to a different location.",
+            );
+            return;
+          }
+          if (lokasiCheck === lokasiDB && kotak !== kotakDB) {
+            showError(
+              "This location has already been assigned to another box.",
+            );
+            return;
+          }
+          if (
+            kotak === kotakDB &&
+            lokasiCheck === lokasiDB &&
+            picCheck !== picDB
+          ) {
+            showError(
+              "PIC must exactly match the existing PIC for this Box Number and Location.",
+            );
+            return;
+          }
+          if (
+            nama === namaDB &&
+            kotak === kotakDB &&
+            lokasiCheck === lokasiDB
+          ) {
+            alert("❌ Barang sudah ada di kotak & lokasi ini!");
+            return;
+          }
+          if (nama === namaDB) {
+            standar = standarDB;
+            found = true;
+          }
+        }
+
+        if (!found) {
+          standar = prompt("Enter Standard Stock for the new item:");
+          if (standar === null || standar.trim() === "") {
+            alert("❌ Standard Stock is required.");
+            return;
+          }
+        }
+
+        const res = await apiCall("tambahBarang", {
+          kotak: kotak.trim(),
+          nama: nama.trim(),
+          standar: Number(standar),
+          stok: Number(stok),
+          pic: pic.trim(),
+          lokasi: lokasi.trim(),
+        });
+
+        if (res.success) {
+          alert("✅ Data saved successfully.");
+          loadData();
+          document.getElementById("newKotak").value = "";
+          document.getElementById("newNama").value = "";
+          document.getElementById("newStok").value = "";
+          document.getElementById("newPic").value = "";
+          document.getElementById("newLokasi").value = "";
+        } else {
+          showError(res.message);
+        }
+      }
+
+      async function bulkReplace() {
+        const findText = document.getElementById("findText").value.trim();
+        const replaceText = document.getElementById("replaceText").value.trim();
+
+        if (!findText) {
+          showError("Please enter the text to find.");
+          return;
+        }
+
+        const res = await apiCall("bulkReplace", { findText, replaceText });
+        if (res.success) {
+          alert(
+            `✅ Mass update completed. (${res.totalUpdate} entries updated)`,
+          );
+          document.getElementById("findText").value = "";
+          document.getElementById("replaceText").value = "";
+          loadData();
+        } else {
+          showError(res.message);
+        }
+      }
+
+      // ==========================================
+      // 📊 DASHBOARD & CHARTS
+      // ==========================================
+      function updateDashboard() {
+        if (!globalData || globalData.length <= 1) return;
+
+        let selected = document.getElementById("filterLokasiChart").value;
+        let dataFiltered =
+          selected === "all"
+            ? globalData
+            : globalData.filter((r, i) => i === 0 || r[5] === selected);
+
+        // 1. Alert Barang Dibawah Standar
+        let habisLabel = [];
+        let habisData = [];
+        let warna = [];
+
+        for (let i = 1; i < dataFiltered.length; i++) {
+          let nama = dataFiltered[i][1];
+          let standar = Number(dataFiltered[i][2]);
+          let stok = Number(dataFiltered[i][3]);
+
+          if (stok < standar) {
+            let need = standar - stok;
+            let text = `${nama} (need:${need})`;
+            habisLabel.push(
+              text.length > 20
+                ? [text.substring(0, 20), text.substring(20)]
+                : text,
+            );
+            habisData.push(stok);
+            warna.push(stok <= standar / 2 ? "#ef4444" : "#f59e0b");
+          }
+        }
+
+        if (chartHabis) chartHabis.destroy();
+        let chartHabisCanvas = document.getElementById("chartHabis");
+        chartHabisCanvas.height = Math.max(habisLabel.length * 50, 200);
+
+        chartHabis = new Chart(chartHabisCanvas, {
+          type: "bar",
+          data: {
+            labels: habisLabel,
+            datasets: [
+              {
+                label: "Items Below Standard",
+                data: habisData,
+                backgroundColor: warna,
+              },
+            ],
+          },
+          options: {
+            indexAxis: "y",
+            responsive: false,
+            maintainAspectRatio: false,
+            scales: {
+              x: { display: false, beginAtZero: true, grace: "100%" },
+              y: {
+                offset: true,
+                ticks: { autoSkip: false, padding: 8, font: { size: 11 } },
+              },
+            },
+            plugins: {
+              legend: { display: false },
+              datalabels: {
+                anchor: "end",
+                align: "right",
+                color: "#000",
+                font: { weight: "bold" },
+              },
+            },
+          },
+          plugins: [ChartDataLabels],
+        });
+
+        // 2. Stok Per Lokasi
+        let mapLokasi = {};
+        for (let i = 1; i < dataFiltered.length; i++) {
+          let l = dataFiltered[i][5];
+          let s = Number(dataFiltered[i][3]);
+          mapLokasi[l] = (mapLokasi[l] || 0) + s;
+        }
+
+        let sortedLokasi = Object.entries(mapLokasi).sort(
+          (a, b) => b[1] - a[1],
+        );
+        let labelLokasi = sortedLokasi.map((x) => x[0]);
+        let valueLokasi = sortedLokasi.map((x) => x[1]);
+
+        document.getElementById("totalItem").innerText =
+          dataFiltered.length - 1;
+        document.getElementById("lowStock").innerText = habisLabel.length;
+        document.getElementById("totalLoc").innerText =
+          Object.keys(mapLokasi).length;
+
+        if (chartLokasi) chartLokasi.destroy();
+        let chartLokasiCanvas = document.getElementById("chartLokasi");
+        chartLokasiCanvas.height = Math.max(labelLokasi.length * 45, 200);
+
+        chartLokasi = new Chart(chartLokasiCanvas, {
+          type: "bar",
+          data: {
+            labels: labelLokasi,
+            datasets: [
+              {
+                label: "Stock by Location",
+                data: valueLokasi,
+                backgroundColor: "#3498db",
+              },
+            ],
+          },
+          options: {
+            indexAxis: "y",
+            responsive: false,
+            maintainAspectRatio: false,
+            scales: { x: { beginAtZero: true, grace: "30%" } },
+            plugins: {
+              legend: { display: false },
+              datalabels: {
+                anchor: "end",
+                align: "right",
+                offset: 8,
+                color: "#000",
+                font: { weight: "bold", size: 12 },
+              },
+            },
+          },
+          plugins: [ChartDataLabels],
+        });
+
+        // 3. Item Details
+        let mapBarang = {};
+        for (let i = 1; i < dataFiltered.length; i++) {
+          let nama = dataFiltered[i][1];
+          let stok = Number(dataFiltered[i][3]);
+          mapBarang[nama] = (mapBarang[nama] || 0) + stok;
+        }
+
+        let sorted = Object.entries(mapBarang).sort((a, b) => b[1] - a[1]);
+        let labels = sorted.map((x) =>
+          x[0].length > 20 ? [x[0].substring(0, 20), x[0].substring(20)] : x[0],
+        );
+        let values = sorted.map((x) => x[1]);
+
+        if (chartKotak) chartKotak.destroy();
+        let chartKotakCanvas = document.getElementById("chartKotak");
+        chartKotakCanvas.height = Math.max(labels.length * 35, 200);
+
+        chartKotak = new Chart(chartKotakCanvas, {
+          type: "bar",
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: "Item Details",
+                data: values,
+                backgroundColor: "#2ecc71",
+              },
+            ],
+          },
+          options: {
+            indexAxis: "y",
+            responsive: false,
+            maintainAspectRatio: false,
+            scales: {
+              x: { beginAtZero: true, grace: "100%" },
+              y: { ticks: { autoSkip: false, font: { size: 11 } } },
+            },
+            plugins: {
+              legend: { display: false },
+              datalabels: {
+                anchor: "end",
+                align: "end",
+                offset: 4,
+                color: "#000",
+                font: { weight: "bold", size: 12 },
+              },
+            },
+          },
+          plugins: [ChartDataLabels],
+        });
+      }
+
+      function loadFilter(data) {
+        let set = new Set();
+        for (let i = 1; i < data.length; i++) set.add(data[i][5]);
+
+        let select = document.getElementById("filterLokasiChart");
+        select.innerHTML = '<option value="all">All Locations</option>';
+        set.forEach((l) => {
+          let opt = document.createElement("option");
+          opt.value = l;
+          opt.text = l;
+          select.appendChild(opt);
+        });
+      }
+
+      function filterData() {
+        const picInput = document
+          .getElementById("filterNama")
+          .value.toLowerCase();
+        const lokasiInput = document
+          .getElementById("filterLokasi")
+          .value.toLowerCase();
+        const rows = document.querySelectorAll("#tabelBarang tr");
+
+        for (let i = 1; i < rows.length; i++) {
+          const pic = rows[i].cells[3].innerText.toLowerCase();
+          const lokasi = rows[i].cells[5].innerText.toLowerCase();
+          rows[i].style.display =
+            pic.includes(picInput) && lokasi.includes(lokasiInput)
+              ? ""
+              : "none";
+        }
+      }
+
+      function downloadLowStockExcel() {
+        let csv =
+          "No;Item Name;Location;PIC;Current Stock;Standard Stock;Need\n";
+        let no = 1;
+
+        for (let i = 1; i < globalData.length; i++) {
+          let nama = globalData[i][1];
+          let standar = Number(globalData[i][2]);
+          let stok = Number(globalData[i][3]);
+          let pic = globalData[i][4];
+          let lokasi = globalData[i][5];
+
+          if (stok < standar) {
+            let need = standar - stok;
+            csv += `${no};"${nama}";"${lokasi}";"${pic}";${stok};${standar};${need}\n`;
+            no++;
+          }
+        }
+
+        let blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        let link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "Low_Stock_Report.csv";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      function showPage(page) {
+        document.getElementById("home").style.display = "none";
+        document.getElementById("input").style.display = "none";
+        document.getElementById(page).style.display = "block";
+      }
+
+      // Window Onload (Cek Session)
+      window.onload = function () {
+        role = localStorage.getItem("role");
+        let savedUser = localStorage.getItem("loginUser");
+
+        if (savedUser) {
+          user = savedUser;
+          document.getElementById("loginPage").style.display = "none";
+          document.getElementById("app").style.display = "block";
+          document.getElementById("namaUser").innerText = user;
+          document.getElementById("userSidebar").innerText = user;
+
+          setupRoleUI(role);
+          if (role === "user") {
+            showPage("input");
+          }
+          loadData();
+        }
+      };
+
+      // Toggle Password View
+      const pwd = document.getElementById("password");
+      const eye = document.getElementById("eyeBtn");
+      eye.addEventListener("mousedown", () => (pwd.type = "text"));
+      eye.addEventListener("mouseup", () => (pwd.type = "password"));
+      eye.addEventListener("mouseleave", () => (pwd.type = "password"));
+      eye.addEventListener("touchstart", () => (pwd.type = "text"));
+      eye.addEventListener("touchend", () => (pwd.type = "password"));
+    </script>
+  </body>
+</html>
