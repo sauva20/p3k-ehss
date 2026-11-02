@@ -9,7 +9,67 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
     exit(0);
 }
 
+session_start();
 require_once __DIR__ . '/config.php';
+
+$pdo->exec("
+    CREATE TABLE IF NOT EXISTS activity_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        actor_name VARCHAR(100) NOT NULL,
+        actor_role VARCHAR(50) NOT NULL,
+        action VARCHAR(100) NOT NULL,
+        item_box VARCHAR(100) DEFAULT NULL,
+        quantity INT DEFAULT NULL,
+        details TEXT NOT NULL,
+        INDEX idx_activity_created_at (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+$quantityColumn = $pdo->prepare("
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'activity_logs'
+      AND COLUMN_NAME = 'quantity'
+");
+$quantityColumn->execute();
+if ((int)$quantityColumn->fetchColumn() === 0) {
+    $pdo->exec("ALTER TABLE activity_logs ADD quantity INT DEFAULT NULL AFTER item_box");
+}
+
+function logActivity(PDO $pdo, string $action, string $details, ?string $itemBox = null, ?int $quantity = null): void
+{
+    if (empty($_SESSION['username']) || empty($_SESSION['role'])) {
+        return;
+    }
+
+    $stmt = $pdo->prepare("
+        INSERT INTO activity_logs (actor_name, actor_role, action, item_box, quantity, details)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ");
+    $stmt->execute([
+        $_SESSION['username'],
+        $_SESSION['role'],
+        $action,
+        $itemBox,
+        $quantity,
+        $details,
+    ]);
+}
+
+function isCurrentAdmin(PDO $pdo): bool
+{
+    if (empty($_SESSION['user_id'])) {
+        return false;
+    }
+
+    $stmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $currentRole = $stmt->fetchColumn();
+
+    return $currentRole === 'admin';
+}
 
 // Tangkap input JSON Body (fetch) atau POST biasa
 $rawInput = file_get_contents('php://input');
@@ -71,9 +131,15 @@ switch ($action) {
             }
 
             if ($isValid) {
+                session_regenerate_id(true);
+                $_SESSION['user_id'] = (int)$user['id'];
+                $_SESSION['username'] = $user['username'];
+                $_SESSION['role'] = strtolower(trim($user['role']));
+                logActivity($pdo, 'Login', 'User berhasil login.');
+
                 echo json_encode([
                     'success'  => true,
-                    'role'     => strtolower(trim($user['role'])),
+                    'role'     => $_SESSION['role'],
                     'username' => $user['username']
                 ]);
                 exit;
@@ -81,6 +147,142 @@ switch ($action) {
         }
 
         echo json_encode(['success' => false, 'message' => 'Username atau password salah']);
+        break;
+
+    case 'getSession':
+        if (empty($_SESSION['user_id'])) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'message' => 'Sesi login tidak ditemukan.']);
+            break;
+        }
+
+        echo json_encode([
+            'success' => true,
+            'username' => $_SESSION['username'],
+            'role' => $_SESSION['role'],
+        ]);
+        break;
+
+    case 'logout':
+        if (!empty($_SESSION['username'])) {
+            logActivity($pdo, 'Logout', 'User berhasil logout.');
+        }
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+        }
+        session_destroy();
+        echo json_encode(['success' => true]);
+        break;
+
+    case 'getActivityLog':
+        if (!isCurrentAdmin($pdo)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Hanya admin yang dapat melihat log activity.']);
+            break;
+        }
+
+        $stmt = $pdo->query("
+            SELECT
+                tanggal AS `Tanggal`,
+                kotak AS `Kode`,
+                aksi AS `Aksi`,
+                jumlah AS `Jumlah`,
+                user
+            FROM transaksi
+            ORDER BY id ASC
+        ");
+        echo json_encode(['success' => true, 'data' => $stmt->fetchAll()]);
+        break;
+
+    case 'getUsers':
+        if (!isCurrentAdmin($pdo)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Hanya admin yang dapat mengelola akun.']);
+            break;
+        }
+
+        $stmt = $pdo->query("SELECT id, username, role FROM users ORDER BY username ASC");
+        echo json_encode(['success' => true, 'data' => $stmt->fetchAll()]);
+        break;
+
+    case 'createUser':
+        if (!isCurrentAdmin($pdo)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Hanya admin yang dapat mengelola akun.']);
+            break;
+        }
+
+        $newUsername = trim($input['username'] ?? '');
+        $newPassword = $input['password'] ?? '';
+        $newRole = strtolower(trim($input['role'] ?? ''));
+
+        if (!preg_match('/^[A-Za-z0-9._-]{3,100}$/', $newUsername)) {
+            echo json_encode(['success' => false, 'message' => 'Username harus 3-100 karakter: huruf, angka, titik, garis bawah, atau tanda hubung.']);
+            break;
+        }
+        if (!is_string($newPassword) || strlen($newPassword) < 8) {
+            echo json_encode(['success' => false, 'message' => 'Password minimal 8 karakter.']);
+            break;
+        }
+        if (!in_array($newRole, ['admin', 'user'], true)) {
+            echo json_encode(['success' => false, 'message' => 'Role harus admin atau user.']);
+            break;
+        }
+
+        try {
+            $stmt = $pdo->prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)");
+            $stmt->execute([$newUsername, password_hash($newPassword, PASSWORD_DEFAULT), $newRole]);
+        } catch (PDOException $error) {
+            if ($error->getCode() === '23000') {
+                echo json_encode(['success' => false, 'message' => 'Username tersebut sudah digunakan.']);
+                break;
+            }
+            throw $error;
+        }
+
+        logActivity($pdo, 'Create user', "Username: {$newUsername}; role: {$newRole}.");
+        echo json_encode(['success' => true, 'message' => 'Akun berhasil dibuat.']);
+        break;
+
+    case 'deleteUser':
+        if (!isCurrentAdmin($pdo)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Hanya admin yang dapat mengelola akun.']);
+            break;
+        }
+
+        $targetId = filter_var($input['id'] ?? null, FILTER_VALIDATE_INT);
+        if (!$targetId || $targetId < 1) {
+            echo json_encode(['success' => false, 'message' => 'ID akun tidak valid.']);
+            break;
+        }
+        if ($targetId === (int)$_SESSION['user_id']) {
+            echo json_encode(['success' => false, 'message' => 'Akun yang sedang digunakan tidak dapat dihapus.']);
+            break;
+        }
+
+        $stmt = $pdo->prepare("SELECT username, role FROM users WHERE id = ?");
+        $stmt->execute([$targetId]);
+        $targetUser = $stmt->fetch();
+        if (!$targetUser) {
+            echo json_encode(['success' => false, 'message' => 'Akun tidak ditemukan.']);
+            break;
+        }
+
+        if ($targetUser['role'] === 'admin') {
+            $adminCount = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn();
+            if ($adminCount <= 1) {
+                echo json_encode(['success' => false, 'message' => 'Akun admin terakhir tidak dapat dihapus.']);
+                break;
+            }
+        }
+
+        $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+        $stmt->execute([$targetId]);
+        logActivity($pdo, 'Delete user', "Username: {$targetUser['username']}; role: {$targetUser['role']}.");
+        echo json_encode(['success' => true, 'message' => 'Akun berhasil dihapus.']);
         break;
 
     // 2. GET BARANG (Format array 2D identik dengan getValues() Google Sheets)
@@ -113,7 +315,7 @@ switch ($action) {
         $id = $input['id'] ?? null;
         $jumlah = (int)($input['jumlah'] ?? 0);
         $aksi = trim($input['aksi'] ?? '');
-        $user = trim($input['user'] ?? 'System');
+        $user = $_SESSION['username'] ?? 'System';
 
         if (!$id || $jumlah <= 0) {
             echo json_encode(['success' => false, 'message' => 'Jumlah harus angka dan > 0']);
@@ -150,6 +352,13 @@ switch ($action) {
         // Catat riwayat log transaksi
         $logStmt = $pdo->prepare("INSERT INTO transaksi (tanggal, kotak, aksi, jumlah, user) VALUES (NOW(), ?, ?, ?, ?)");
         $logStmt->execute([$item['kotak'], $aksi, $jumlah, $user]);
+        logActivity(
+            $pdo,
+            $aksi,
+            "Jumlah: {$jumlah}; stok setelah perubahan: {$stokSekarang}.",
+            $item['kotak'],
+            $jumlah
+        );
 
         echo json_encode(['success' => true, 'message' => '✅ Data berhasil disimpan']);
         break;
@@ -170,6 +379,12 @@ switch ($action) {
 
         $stmt = $pdo->prepare("INSERT INTO barang (kotak, nama, standar, stok, pic, lokasi) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([$kotak, $nama, $standar, $stok, $pic, $lokasi]);
+        logActivity(
+            $pdo,
+            'Add item',
+            "Nama: {$nama}; stok: {$stok}; PIC: {$pic}; lokasi: {$lokasi}.",
+            $kotak
+        );
 
         echo json_encode(['success' => true, 'message' => '✅ Data saved successfully.', 'id' => $pdo->lastInsertId()]);
         break;
@@ -188,8 +403,22 @@ switch ($action) {
             exit;
         }
 
+        $beforeStmt = $pdo->prepare("SELECT kotak, nama, stok, pic, lokasi FROM barang WHERE id = ?");
+        $beforeStmt->execute([$id]);
+        $before = $beforeStmt->fetch();
+        if (!$before) {
+            echo json_encode(['success' => false, 'message' => 'Data barang tidak ditemukan']);
+            exit;
+        }
+
         $stmt = $pdo->prepare("UPDATE barang SET kotak = ?, nama = ?, stok = ?, pic = ?, lokasi = ? WHERE id = ?");
         $stmt->execute([$kotak, $nama, $stok, $pic, $lokasi, $id]);
+        logActivity(
+            $pdo,
+            'Edit item',
+            "Kotak: {$before['kotak']} -> {$kotak}; nama: {$before['nama']} -> {$nama}; stok: {$before['stok']} -> {$stok}; PIC: {$pic}; lokasi: {$lokasi}.",
+            $kotak
+        );
 
         echo json_encode(['success' => true, 'message' => '✅ Item updated successfully.']);
         break;
@@ -202,8 +431,17 @@ switch ($action) {
             exit;
         }
 
+        $itemStmt = $pdo->prepare("SELECT kotak, nama FROM barang WHERE id = ?");
+        $itemStmt->execute([$id]);
+        $item = $itemStmt->fetch();
+        if (!$item) {
+            echo json_encode(['success' => false, 'message' => 'Data barang tidak ditemukan']);
+            exit;
+        }
+
         $stmt = $pdo->prepare("DELETE FROM barang WHERE id = ?");
         $stmt->execute([$id]);
+        logActivity($pdo, 'Delete item', "Nama: {$item['nama']}.", $item['kotak']);
 
         echo json_encode(['success' => true, 'message' => '✅ Item deleted successfully.']);
         break;
@@ -252,6 +490,11 @@ switch ($action) {
             $likeText,
             $likeText,
         ]);
+        logActivity(
+            $pdo,
+            'Bulk replace',
+            "Teks '{$findText}' diganti menjadi '{$replaceText}' pada {$stmt->rowCount()} barang."
+        );
 
         echo json_encode([
             'success' => true,

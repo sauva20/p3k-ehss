@@ -657,6 +657,20 @@
           <button id="btnDashboard" onclick="showPage('home')">
             📊 Dashboard
           </button>
+          <button
+            id="btnActivity"
+            onclick="showPage('activity')"
+            style="display: none"
+          >
+            🧾 Log Activity
+          </button>
+          <button
+            id="btnUsers"
+            onclick="showPage('users')"
+            style="display: none"
+          >
+            👥 Manajemen User
+          </button>
           <button onclick="showPage('input')">📦 First Aid Input</button>
           <button onclick="logout()">🚪 Logout</button>
         </div>
@@ -705,7 +719,10 @@
               >
                 <option value="all">All Locations</option>
               </select>
-              <button onclick="downloadLowStockExcel()" class="btn-export">
+              <button onclick="downloadInventoryCsv(false)" class="btn-export">
+                📥 Download All Inventory
+              </button>
+              <button onclick="downloadInventoryCsv(true)" class="btn-export">
                 📥 Download Low Stock Report
               </button>
             </div>
@@ -802,6 +819,80 @@
               <button class="btn-save" onclick="tambahBarangBaru()">
                 💾 Save Inventory
               </button>
+            </div>
+          </div>
+
+          <div id="activity" style="display: none">
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 12px;
+                flex-wrap: wrap;
+              "
+            >
+              <h2 style="margin-top: 0">🧾 Log Activity</h2>
+              <button class="btn-export" onclick="loadActivityLog()">
+                🔄 Refresh Log
+              </button>
+            </div>
+            <p>Menampilkan riwayat transaksi stok yang tersimpan di database.</p>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tanggal</th>
+                    <th>Kode</th>
+                    <th>Aksi</th>
+                    <th>Jumlah</th>
+                    <th>user</th>
+                  </tr>
+                </thead>
+                <tbody id="activityLogRows">
+                  <tr><td colspan="5">Memuat log activity...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="users" style="display: none">
+            <h2 style="margin-top: 0">👥 Manajemen User</h2>
+            <div class="box">
+              <h3 style="margin-top: 0; color: #1e293b">Tambah Akun</h3>
+              <input
+                id="newUsername"
+                placeholder="Username"
+                autocomplete="off"
+                maxlength="100"
+              />
+              <input
+                id="newUserPassword"
+                type="password"
+                placeholder="Password (minimal 8 karakter)"
+                autocomplete="new-password"
+              />
+              <select id="newUserRole">
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
+              <button class="btn-save" onclick="createUser()">
+                ➕ Buat Akun
+              </button>
+            </div>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="usersRows">
+                  <tr><td colspan="3">Memuat daftar akun...</td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1086,12 +1177,12 @@
             captchaToken,
           });
           if (res.success) {
-            user = u;
             role = res.role.toString().trim().toLowerCase();
+            user = res.username;
 
             setupRoleUI(role);
 
-            localStorage.setItem("loginUser", u);
+            localStorage.setItem("loginUser", user);
             localStorage.setItem("role", role);
 
             document.getElementById("loginPage").style.display = "none";
@@ -1127,15 +1218,24 @@
           document.querySelector(".user-role").innerText = "First Aid Team";
           document.getElementById("bulkReplaceBox").style.display = "none";
           document.getElementById("btnDashboard").style.display = "none";
+          document.getElementById("btnActivity").style.display = "none";
+          document.getElementById("btnUsers").style.display = "none";
         } else {
           document.querySelector(".avatar").innerHTML = "👩🏻";
           document.querySelector(".user-role").innerText = "Administrator";
           document.getElementById("bulkReplaceBox").style.display = "flex";
           document.getElementById("btnDashboard").style.display = "block";
+          document.getElementById("btnActivity").style.display = "block";
+          document.getElementById("btnUsers").style.display = "block";
         }
       }
 
-      function logout() {
+      async function logout() {
+        try {
+          await apiCall("logout");
+        } catch (error) {
+          console.error("Gagal mencatat logout:", error);
+        }
         localStorage.removeItem("loginUser");
         localStorage.removeItem("role");
 
@@ -1144,6 +1244,160 @@
         document.getElementById("username").value = "";
         document.getElementById("password").value = "";
         document.getElementById("errorLogin").style.display = "none";
+      }
+
+      async function loadActivityLog() {
+        const tbody = document.getElementById("activityLogRows");
+        tbody.innerHTML = "<tr><td colspan='5'>Memuat log activity...</td></tr>";
+
+        try {
+          const res = await apiCall("getActivityLog");
+          if (!res.success) throw new Error(res.message || "Gagal memuat log.");
+
+          tbody.replaceChildren();
+          if (res.data.length === 0) {
+            const row = tbody.insertRow();
+            const cell = row.insertCell();
+            cell.colSpan = 5;
+            cell.textContent = "Belum ada aktivitas tercatat.";
+            return;
+          }
+
+          for (const entry of res.data) {
+            const row = tbody.insertRow();
+            [
+              entry.Tanggal,
+              entry.Kode || "-",
+              entry.Aksi,
+              entry.Jumlah ?? "-",
+              entry.user,
+            ].forEach((value) => {
+              row.insertCell().textContent = value ?? "";
+            });
+          }
+        } catch (error) {
+          console.error("Gagal memuat log activity:", error);
+          tbody.replaceChildren();
+          const row = tbody.insertRow();
+          const cell = row.insertCell();
+          cell.colSpan = 5;
+          cell.textContent = error.message || "Gagal memuat log activity.";
+        }
+      }
+
+      async function loadUsers() {
+        const tbody = document.getElementById("usersRows");
+        tbody.innerHTML = "<tr><td colspan='3'>Memuat daftar akun...</td></tr>";
+
+        try {
+          const res = await apiCall("getUsers");
+          if (!res.success) throw new Error(res.message || "Gagal memuat akun.");
+
+          tbody.replaceChildren();
+          for (const account of res.data) {
+            const row = tbody.insertRow();
+            row.insertCell().textContent = account.username;
+            row.insertCell().textContent =
+              account.role === "admin" ? "Admin" : "User";
+            const actionCell = row.insertCell();
+            const deleteButton = document.createElement("button");
+            deleteButton.type = "button";
+            deleteButton.textContent = "Hapus";
+            deleteButton.disabled =
+              account.username.toLowerCase() === user.toLowerCase();
+            deleteButton.title = deleteButton.disabled
+              ? "Akun yang sedang digunakan tidak dapat dihapus"
+              : "Hapus akun";
+            deleteButton.addEventListener("click", () => deleteUser(account.id, account.username));
+            actionCell.appendChild(deleteButton);
+          }
+
+          if (res.data.length === 0) {
+            const row = tbody.insertRow();
+            const cell = row.insertCell();
+            cell.colSpan = 3;
+            cell.textContent = "Belum ada akun.";
+          }
+        } catch (error) {
+          console.error("Gagal memuat daftar akun:", error);
+          tbody.replaceChildren();
+          const row = tbody.insertRow();
+          const cell = row.insertCell();
+          cell.colSpan = 3;
+          cell.textContent = error.message || "Gagal memuat daftar akun.";
+        }
+      }
+
+      async function createUser() {
+        const username = document.getElementById("newUsername").value.trim();
+        const password = document.getElementById("newUserPassword").value;
+        const userRole = document.getElementById("newUserRole").value;
+
+        try {
+          const res = await apiCall("createUser", {
+            username,
+            password,
+            role: userRole,
+          });
+          if (!res.success) {
+            showError(res.message || "Gagal membuat akun.");
+            return;
+          }
+
+          document.getElementById("newUsername").value = "";
+          document.getElementById("newUserPassword").value = "";
+          document.getElementById("newUserRole").value = "user";
+          await loadUsers();
+          alert(res.message);
+        } catch (error) {
+          console.error("Gagal membuat akun:", error);
+          showError("Tidak dapat membuat akun. Periksa koneksi server.");
+        }
+      }
+
+      async function deleteUser(id, username) {
+        if (!window.confirm(`Hapus akun "${username}"?`)) return;
+
+        try {
+          const res = await apiCall("deleteUser", { id });
+          if (!res.success) {
+            showError(res.message || "Gagal menghapus akun.");
+            return;
+          }
+          await loadUsers();
+        } catch (error) {
+          console.error("Gagal menghapus akun:", error);
+          showError("Tidak dapat menghapus akun. Periksa koneksi server.");
+        }
+      }
+
+      async function restoreSession() {
+        try {
+          const res = await apiCall("getSession");
+          if (!res.success) throw new Error("Sesi login sudah berakhir.");
+          user = res.username;
+          role = res.role.toLowerCase();
+          localStorage.setItem("loginUser", user);
+          localStorage.setItem("role", role);
+          document.getElementById("loginPage").style.display = "none";
+          document.getElementById("app").style.display = "block";
+          document.getElementById("namaUser").innerText = user;
+          document.getElementById("userSidebar").innerText = user;
+          setupRoleUI(role);
+          if (role === "user") showPage("input");
+          loadData();
+        } catch (error) {
+          localStorage.removeItem("loginUser");
+          localStorage.removeItem("role");
+          document.getElementById("loginPage").style.display = "flex";
+          document.getElementById("app").style.display = "none";
+          const errorLogin = document.getElementById("errorLogin");
+          errorLogin.innerText =
+            error.message === "Sesi login sudah berakhir."
+              ? "Sesi login berakhir. Silakan login kembali."
+              : "Tidak dapat memverifikasi sesi. Periksa koneksi server lalu login kembali.";
+          errorLogin.style.display = "block";
+        }
       }
 
       // ==========================================
@@ -1669,59 +1923,89 @@
         }
       }
 
-      function downloadLowStockExcel() {
-        let csv =
-          "No;Item Name;Location;PIC;Current Stock;Standard Stock;Need\n";
+      function downloadInventoryCsv(lowStockOnly) {
+        if (!globalData || globalData.length <= 1) {
+          showError("No inventory data is available to export.");
+          return;
+        }
+
+        const headers = lowStockOnly
+          ? [
+              "No",
+              "Box Number",
+              "Item Name",
+              "Location",
+              "PIC",
+              "Current Stock",
+              "Standard Stock",
+              "Need",
+            ]
+          : [
+              "Box Number",
+              "Item Name",
+              "Standard Stock",
+              "Current Stock",
+              "PIC",
+              "Location",
+            ];
+        const escapeCsv = (value) =>
+          `"${String(value ?? "").replace(/"/g, '""')}"`;
+        const rows = [headers.map(escapeCsv).join(";")];
         let no = 1;
 
         for (let i = 1; i < globalData.length; i++) {
-          let nama = globalData[i][1];
-          let standar = Number(globalData[i][2]);
-          let stok = Number(globalData[i][3]);
-          let pic = globalData[i][4];
-          let lokasi = globalData[i][5];
+          const row = globalData[i];
+          const standar = Number(row[2]);
+          const stok = Number(row[3]);
 
-          if (stok < standar) {
-            let need = standar - stok;
-            csv += `${no};"${nama}";"${lokasi}";"${pic}";${stok};${standar};${need}\n`;
-            no++;
-          }
+          if (lowStockOnly && stok >= standar) continue;
+
+          const values = lowStockOnly
+            ? [
+                no++,
+                row[0],
+                row[1],
+                row[5],
+                row[4],
+                stok,
+                standar,
+                standar - stok,
+              ]
+            : [row[0], row[1], standar, stok, row[4], row[5]];
+
+          rows.push(values.map(escapeCsv).join(";"));
         }
 
-        let blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        if (lowStockOnly && no === 1) {
+          showError("There are no low-stock items to export.");
+          return;
+        }
+
+        const csv = `sep=;\r\n${rows.join("\r\n")}\r\n`;
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
         let link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = "Low_Stock_Report.csv";
+        link.download = lowStockOnly
+          ? "Low_Stock_Report.csv"
+          : "All_Inventory.csv";
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
       }
 
       function showPage(page) {
         document.getElementById("home").style.display = "none";
         document.getElementById("input").style.display = "none";
+        document.getElementById("activity").style.display = "none";
+        document.getElementById("users").style.display = "none";
         document.getElementById(page).style.display = "block";
+        if (page === "activity") loadActivityLog();
+        if (page === "users") loadUsers();
       }
 
       // Window Onload (Cek Session)
-      window.onload = function () {
-        role = localStorage.getItem("role");
-        let savedUser = localStorage.getItem("loginUser");
-
-        if (savedUser) {
-          user = savedUser;
-          document.getElementById("loginPage").style.display = "none";
-          document.getElementById("app").style.display = "block";
-          document.getElementById("namaUser").innerText = user;
-          document.getElementById("userSidebar").innerText = user;
-
-          setupRoleUI(role);
-          if (role === "user") {
-            showPage("input");
-          }
-          loadData();
-        }
-      };
+      window.onload = restoreSession;
 
       // Toggle Password View
       const pwd = document.getElementById("password");
