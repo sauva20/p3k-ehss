@@ -40,17 +40,13 @@ if ((int)$quantityColumn->fetchColumn() === 0) {
 
 function logActivity(PDO $pdo, string $action, string $details, ?string $itemBox = null, ?int $quantity = null): void
 {
-    if (empty($_SESSION['username']) || empty($_SESSION['role'])) {
-        return;
-    }
-
     $stmt = $pdo->prepare("
         INSERT INTO activity_logs (created_at, actor_name, actor_role, action, item_box, quantity, details)
         VALUES (NOW(), ?, ?, ?, ?, ?, ?)
     ");
     $stmt->execute([
-        $_SESSION['username'],
-        $_SESSION['role'],
+        !empty($_SESSION['username']) ? $_SESSION['username'] : 'System',
+        !empty($_SESSION['role']) ? $_SESSION['role'] : 'system',
         $action,
         $itemBox,
         $quantity,
