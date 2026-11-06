@@ -1,12 +1,17 @@
 <?php
 // api.php - Native REST API Backend (Pengganti Google Apps Script .gs)
-header('Content-Type: application/json; charset=utf-8');
+header('Content-Type: text/plain; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
     exit(0);
+}
+
+function sendResponse(array $response): void
+{
+    echo http_build_query($response);
 }
 
 session_start();
@@ -67,9 +72,8 @@ function isCurrentAdmin(PDO $pdo): bool
     return $currentRole === 'admin';
 }
 
-// Tangkap input JSON Body (fetch) atau POST biasa
-$rawInput = file_get_contents('php://input');
-$input = json_decode($rawInput, true) ?? $_POST;
+// Terima input form-urlencoded dari fetch atau POST biasa
+$input = $_POST;
 $action = $_GET['action'] ?? ($input['action'] ?? '');
 
 switch ($action) {
@@ -81,7 +85,7 @@ switch ($action) {
         $captchaToken = trim($input['captchaToken'] ?? '');
 
         if ($captchaToken === '') {
-            echo json_encode(['success' => false, 'message' => 'Please complete the reCAPTCHA check']);
+            sendResponse(['success' => false, 'message' => 'Please complete the reCAPTCHA check']);
             exit;
         }
 
@@ -100,12 +104,12 @@ switch ($action) {
         $verification = $verifyResponse !== false ? json_decode($verifyResponse, true) : null;
 
         if (!is_array($verification) || empty($verification['success'])) {
-            echo json_encode(['success' => false, 'message' => 'reCAPTCHA verification failed. Please try again']);
+            sendResponse(['success' => false, 'message' => 'reCAPTCHA verification failed. Please try again']);
             exit;
         }
 
         if ($username === '' || $password === '') {
-            echo json_encode(['success' => false, 'message' => 'Username dan password wajib diisi']);
+            sendResponse(['success' => false, 'message' => 'Username dan password wajib diisi']);
             exit;
         }
 
@@ -133,7 +137,7 @@ switch ($action) {
                 $_SESSION['role'] = strtolower(trim($user['role']));
                 logActivity($pdo, 'Login', 'User berhasil login.');
 
-                echo json_encode([
+                sendResponse([
                     'success'  => true,
                     'role'     => $_SESSION['role'],
                     'username' => $user['username']
@@ -142,17 +146,17 @@ switch ($action) {
             }
         }
 
-        echo json_encode(['success' => false, 'message' => 'Username atau password salah']);
+        sendResponse(['success' => false, 'message' => 'Username atau password salah']);
         break;
 
     case 'getSession':
         if (empty($_SESSION['user_id'])) {
             http_response_code(401);
-            echo json_encode(['success' => false, 'message' => 'Sesi login tidak ditemukan.']);
+            sendResponse(['success' => false, 'message' => 'Sesi login tidak ditemukan.']);
             break;
         }
 
-        echo json_encode([
+        sendResponse([
             'success' => true,
             'username' => $_SESSION['username'],
             'role' => $_SESSION['role'],
@@ -169,13 +173,13 @@ switch ($action) {
             setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
         }
         session_destroy();
-        echo json_encode(['success' => true]);
+        sendResponse(['success' => true]);
         break;
 
     case 'getActivityLog':
         if (!isCurrentAdmin($pdo)) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Hanya admin yang dapat melihat log activity.']);
+            sendResponse(['success' => false, 'message' => 'Hanya admin yang dapat melihat log activity.']);
             break;
         }
 
@@ -217,24 +221,24 @@ switch ($action) {
             ) AS activity_history
             ORDER BY `Tanggal` DESC
         ");
-        echo json_encode(['success' => true, 'data' => $stmt->fetchAll()]);
+        sendResponse(['success' => true, 'data' => $stmt->fetchAll()]);
         break;
 
     case 'getUsers':
         if (!isCurrentAdmin($pdo)) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Hanya admin yang dapat mengelola akun.']);
+            sendResponse(['success' => false, 'message' => 'Hanya admin yang dapat mengelola akun.']);
             break;
         }
 
         $stmt = $pdo->query("SELECT id, username, role FROM users ORDER BY username ASC");
-        echo json_encode(['success' => true, 'data' => $stmt->fetchAll()]);
+        sendResponse(['success' => true, 'data' => $stmt->fetchAll()]);
         break;
 
     case 'createUser':
         if (!isCurrentAdmin($pdo)) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Hanya admin yang dapat mengelola akun.']);
+            sendResponse(['success' => false, 'message' => 'Hanya admin yang dapat mengelola akun.']);
             break;
         }
 
@@ -243,15 +247,15 @@ switch ($action) {
         $newRole = strtolower(trim($input['role'] ?? ''));
 
         if (!preg_match('/^[A-Za-z0-9._-]{3,100}$/', $newUsername)) {
-            echo json_encode(['success' => false, 'message' => 'Username harus 3-100 karakter: huruf, angka, titik, garis bawah, atau tanda hubung.']);
+            sendResponse(['success' => false, 'message' => 'Username harus 3-100 karakter: huruf, angka, titik, garis bawah, atau tanda hubung.']);
             break;
         }
         if (!is_string($newPassword) || strlen($newPassword) < 8) {
-            echo json_encode(['success' => false, 'message' => 'Password minimal 8 karakter.']);
+            sendResponse(['success' => false, 'message' => 'Password minimal 8 karakter.']);
             break;
         }
         if (!in_array($newRole, ['admin', 'user'], true)) {
-            echo json_encode(['success' => false, 'message' => 'Role harus admin atau user.']);
+            sendResponse(['success' => false, 'message' => 'Role harus admin atau user.']);
             break;
         }
 
@@ -260,30 +264,30 @@ switch ($action) {
             $stmt->execute([$newUsername, password_hash($newPassword, PASSWORD_DEFAULT), $newRole]);
         } catch (PDOException $error) {
             if ($error->getCode() === '23000') {
-                echo json_encode(['success' => false, 'message' => 'Username tersebut sudah digunakan.']);
+                sendResponse(['success' => false, 'message' => 'Username tersebut sudah digunakan.']);
                 break;
             }
             throw $error;
         }
 
         logActivity($pdo, 'Create user', "Username: {$newUsername}; role: {$newRole}.");
-        echo json_encode(['success' => true, 'message' => 'Akun berhasil dibuat.']);
+        sendResponse(['success' => true, 'message' => 'Akun berhasil dibuat.']);
         break;
 
     case 'deleteUser':
         if (!isCurrentAdmin($pdo)) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Hanya admin yang dapat mengelola akun.']);
+            sendResponse(['success' => false, 'message' => 'Hanya admin yang dapat mengelola akun.']);
             break;
         }
 
         $targetId = filter_var($input['id'] ?? null, FILTER_VALIDATE_INT);
         if (!$targetId || $targetId < 1) {
-            echo json_encode(['success' => false, 'message' => 'ID akun tidak valid.']);
+            sendResponse(['success' => false, 'message' => 'ID akun tidak valid.']);
             break;
         }
         if ($targetId === (int)$_SESSION['user_id']) {
-            echo json_encode(['success' => false, 'message' => 'Akun yang sedang digunakan tidak dapat dihapus.']);
+            sendResponse(['success' => false, 'message' => 'Akun yang sedang digunakan tidak dapat dihapus.']);
             break;
         }
 
@@ -291,14 +295,14 @@ switch ($action) {
         $stmt->execute([$targetId]);
         $targetUser = $stmt->fetch();
         if (!$targetUser) {
-            echo json_encode(['success' => false, 'message' => 'Akun tidak ditemukan.']);
+            sendResponse(['success' => false, 'message' => 'Akun tidak ditemukan.']);
             break;
         }
 
         if ($targetUser['role'] === 'admin') {
             $adminCount = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn();
             if ($adminCount <= 1) {
-                echo json_encode(['success' => false, 'message' => 'Akun admin terakhir tidak dapat dihapus.']);
+                sendResponse(['success' => false, 'message' => 'Akun admin terakhir tidak dapat dihapus.']);
                 break;
             }
         }
@@ -306,7 +310,7 @@ switch ($action) {
         $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
         $stmt->execute([$targetId]);
         logActivity($pdo, 'Delete user', "Username: {$targetUser['username']}; role: {$targetUser['role']}.");
-        echo json_encode(['success' => true, 'message' => 'Akun berhasil dihapus.']);
+        sendResponse(['success' => true, 'message' => 'Akun berhasil dihapus.']);
         break;
 
     // 2. GET BARANG (Format array 2D identik dengan getValues() Google Sheets)
@@ -331,7 +335,7 @@ switch ($action) {
             ];
         }
 
-        echo json_encode(['success' => true, 'data' => $data]);
+        sendResponse(['success' => true, 'data' => $data]);
         break;
 
     // 3. UPDATE STOK
@@ -342,7 +346,7 @@ switch ($action) {
         $user = $_SESSION['username'] ?? 'System';
 
         if (!$id || $jumlah <= 0) {
-            echo json_encode(['success' => false, 'message' => 'Jumlah harus angka dan > 0']);
+            sendResponse(['success' => false, 'message' => 'Jumlah harus angka dan > 0']);
             exit;
         }
 
@@ -351,7 +355,7 @@ switch ($action) {
         $item = $stmt->fetch();
 
         if (!$item) {
-            echo json_encode(['success' => false, 'message' => 'Data barang tidak ditemukan']);
+            sendResponse(['success' => false, 'message' => 'Data barang tidak ditemukan']);
             exit;
         }
 
@@ -360,12 +364,12 @@ switch ($action) {
             $stokSekarang += $jumlah;
         } elseif ($aksi === 'kurang') {
             if ($jumlah > $stokSekarang) {
-                echo json_encode(['success' => false, 'message' => '❌ Stok tidak cukup!']);
+                sendResponse(['success' => false, 'message' => '❌ Stok tidak cukup!']);
                 exit;
             }
             $stokSekarang -= $jumlah;
         } else {
-            echo json_encode(['success' => false, 'message' => 'Aksi tidak valid']);
+            sendResponse(['success' => false, 'message' => 'Aksi tidak valid']);
             exit;
         }
 
@@ -384,7 +388,7 @@ switch ($action) {
             $jumlah
         );
 
-        echo json_encode(['success' => true, 'message' => '✅ Data berhasil disimpan']);
+        sendResponse(['success' => true, 'message' => '✅ Data berhasil disimpan']);
         break;
 
     // 4. TAMBAH BARANG
@@ -397,7 +401,7 @@ switch ($action) {
         $lokasi = trim($input['lokasi'] ?? '');
 
         if ($kotak === '' || $nama === '' || $pic === '' || $lokasi === '' || $stok < 0) {
-            echo json_encode(['success' => false, 'message' => 'Semua kolom wajib diisi dan stok harus >= 0']);
+            sendResponse(['success' => false, 'message' => 'Semua kolom wajib diisi dan stok harus >= 0']);
             exit;
         }
 
@@ -410,7 +414,7 @@ switch ($action) {
             $kotak
         );
 
-        echo json_encode(['success' => true, 'message' => '✅ Data saved successfully.', 'id' => $pdo->lastInsertId()]);
+        sendResponse(['success' => true, 'message' => '✅ Data saved successfully.', 'id' => $pdo->lastInsertId()]);
         break;
 
     // 5. EDIT BARANG
@@ -423,7 +427,7 @@ switch ($action) {
         $lokasi = trim($input['lokasi'] ?? '');
 
         if (!$id || $kotak === '' || $nama === '' || $pic === '' || $lokasi === '' || $stok < 0) {
-            echo json_encode(['success' => false, 'message' => 'Data tidak lengkap untuk update']);
+            sendResponse(['success' => false, 'message' => 'Data tidak lengkap untuk update']);
             exit;
         }
 
@@ -431,7 +435,7 @@ switch ($action) {
         $beforeStmt->execute([$id]);
         $before = $beforeStmt->fetch();
         if (!$before) {
-            echo json_encode(['success' => false, 'message' => 'Data barang tidak ditemukan']);
+            sendResponse(['success' => false, 'message' => 'Data barang tidak ditemukan']);
             exit;
         }
 
@@ -444,14 +448,14 @@ switch ($action) {
             $kotak
         );
 
-        echo json_encode(['success' => true, 'message' => '✅ Item updated successfully.']);
+        sendResponse(['success' => true, 'message' => '✅ Item updated successfully.']);
         break;
 
     // 6. HAPUS BARANG
     case 'hapusBarang':
         $id = $input['id'] ?? null;
         if (!$id) {
-            echo json_encode(['success' => false, 'message' => 'ID tidak ditemukan']);
+            sendResponse(['success' => false, 'message' => 'ID tidak ditemukan']);
             exit;
         }
 
@@ -459,7 +463,7 @@ switch ($action) {
         $itemStmt->execute([$id]);
         $item = $itemStmt->fetch();
         if (!$item) {
-            echo json_encode(['success' => false, 'message' => 'Data barang tidak ditemukan']);
+            sendResponse(['success' => false, 'message' => 'Data barang tidak ditemukan']);
             exit;
         }
 
@@ -467,7 +471,7 @@ switch ($action) {
         $stmt->execute([$id]);
         logActivity($pdo, 'Delete item', "Nama: {$item['nama']}.", $item['kotak']);
 
-        echo json_encode(['success' => true, 'message' => '✅ Item deleted successfully.']);
+        sendResponse(['success' => true, 'message' => '✅ Item deleted successfully.']);
         break;
 
     // 7. BULK REPLACE (Mass Find & Replace)
@@ -476,12 +480,12 @@ switch ($action) {
         $replaceText = trim($input['replaceText'] ?? '');
 
         if ($findText === '') {
-            echo json_encode(['success' => false, 'message' => 'Teks cari tidak boleh kosong']);
+            sendResponse(['success' => false, 'message' => 'Teks cari tidak boleh kosong']);
             exit;
         }
 
         if (strtolower($findText) === strtolower($replaceText)) {
-            echo json_encode(['success' => false, 'message' => 'Teks cari dan pengganti tidak boleh sama, baik huruf besar/kecilnya.']);
+            sendResponse(['success' => false, 'message' => 'Teks cari dan pengganti tidak boleh sama, baik huruf besar/kecilnya.']);
             exit;
         }
 
@@ -521,7 +525,7 @@ switch ($action) {
             "Teks '{$findText}' diganti menjadi '{$replaceText}' pada {$stmt->rowCount()} barang."
         );
 
-        echo json_encode([
+        sendResponse([
             'success' => true,
             'message' => '✅ Mass update completed.',
             'totalUpdate' => $stmt->rowCount()
@@ -529,6 +533,6 @@ switch ($action) {
         break;
 
     default:
-        echo json_encode(['success' => false, 'message' => 'Action tidak dikenali']);
+        sendResponse(['success' => false, 'message' => 'Action tidak dikenali']);
         break;
 }

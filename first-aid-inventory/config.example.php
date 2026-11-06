@@ -37,7 +37,7 @@ if ($is_local) {
 
     if ($missing_settings !== []) {
         http_response_code(500);
-        echo json_encode([
+        echo http_build_query([
             'success' => false,
             'message' => 'Konfigurasi server belum lengkap. Atur environment variable: ' . implode(', ', $missing_settings),
         ]);
@@ -59,7 +59,7 @@ try {
 } catch (PDOException $e) {
     error_log('Database connection failed: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode([
+    echo http_build_query([
         'success' => false,
         'message' => 'Koneksi database gagal. Periksa environment variable DB_* di konfigurasi server.',
     ]);

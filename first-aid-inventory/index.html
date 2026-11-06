@@ -1057,12 +1057,47 @@
       // ==========================================
       // 🚀 NATIVE API CLIENT (Menggantikan google.script.run)
       // ==========================================
+      function parseApiResponse(text, action) {
+        const response = {};
+
+        for (const [key, value] of new URLSearchParams(text)) {
+          const path = key.replace(/\]/g, "").split("[");
+          let current = response;
+
+          for (let i = 0; i < path.length; i++) {
+            const part = path[i];
+            if (i === path.length - 1) {
+              current[part] = value;
+              continue;
+            }
+
+            const nextIsIndex = /^\d+$/.test(path[i + 1]);
+            if (!current[part]) current[part] = nextIsIndex ? [] : {};
+            current = current[part];
+          }
+        }
+
+        if (response.success !== undefined) {
+          response.success = response.success === "1";
+        }
+        if (
+          response.data === undefined &&
+          ["getActivityLog", "getUsers", "getBarang"].includes(action)
+        ) {
+          response.data = [];
+        }
+
+        return response;
+      }
+
       async function apiCall(action, payload = {}) {
         try {
           const res = await fetch(`api.php?action=${action}`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            },
+            body: new URLSearchParams(payload),
           });
 
           const text = await res.text();
@@ -1072,22 +1107,23 @@
             return { success: false, message: "Empty server response." };
           }
 
-          if (res.status >= 400) {
+          const response = parseApiResponse(text, action);
+          if (response.success === undefined) {
+            console.error("API Response Parse Error:", text);
+            return {
+              success: false,
+              message: `Server returned an invalid response: ${text}`,
+            };
+          }
+
+          if (res.status >= 400 && response.success) {
             return {
               success: false,
               message: `HTTP ${res.status}: ${text}`,
             };
           }
 
-          try {
-            return JSON.parse(text);
-          } catch (error) {
-            console.error("API Response Parse Error:", error, text);
-            return {
-              success: false,
-              message: `Server returned an invalid response: ${text}`,
-            };
-          }
+          return response;
         } catch (error) {
           console.error("API Call Error:", error);
           return {
