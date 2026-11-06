@@ -181,13 +181,41 @@ switch ($action) {
 
         $stmt = $pdo->query("
             SELECT
-                tanggal AS `Tanggal`,
-                kotak AS `Kode`,
-                aksi AS `Aksi`,
-                jumlah AS `Jumlah`,
-                user
-            FROM transaksi
-            ORDER BY id ASC
+                `Tanggal`,
+                `User`,
+                `Role`,
+                `Aksi`,
+                `Kode`,
+                `Jumlah`,
+                `Detail`,
+                `Sumber`
+            FROM (
+                SELECT
+                    tanggal AS `Tanggal`,
+                    user AS `User`,
+                    '' AS `Role`,
+                    aksi AS `Aksi`,
+                    kotak AS `Kode`,
+                    jumlah AS `Jumlah`,
+                    '' AS `Detail`,
+                    'Transaksi stok' AS `Sumber`
+                FROM transaksi
+
+                UNION ALL
+
+                SELECT
+                    created_at AS `Tanggal`,
+                    actor_name AS `User`,
+                    actor_role AS `Role`,
+                    action AS `Aksi`,
+                    item_box AS `Kode`,
+                    quantity AS `Jumlah`,
+                    details AS `Detail`,
+                    'Aktivitas' AS `Sumber`
+                FROM activity_logs
+                WHERE action NOT IN ('tambah', 'kurang')
+            ) AS activity_history
+            ORDER BY `Tanggal` DESC
         ");
         echo json_encode(['success' => true, 'data' => $stmt->fetchAll()]);
         break;

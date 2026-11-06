@@ -837,20 +837,23 @@
                 🔄 Refresh Log
               </button>
             </div>
-            <p>Menampilkan riwayat transaksi stok yang tersimpan di database.</p>
+            <p>Menampilkan aktivitas perubahan data dan transaksi stok.</p>
             <div class="table-wrapper">
               <table>
                 <thead>
                   <tr>
                     <th>Tanggal</th>
-                    <th>Kode</th>
+                    <th>User</th>
+                    <th>Role</th>
                     <th>Aksi</th>
+                    <th>Kode</th>
                     <th>Jumlah</th>
-                    <th>user</th>
+                    <th>Detail</th>
+                    <th>Sumber</th>
                   </tr>
                 </thead>
                 <tbody id="activityLogRows">
-                  <tr><td colspan="5">Memuat log activity...</td></tr>
+                  <tr><td colspan="8">Memuat log activity...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -1248,7 +1251,7 @@
 
       async function loadActivityLog() {
         const tbody = document.getElementById("activityLogRows");
-        tbody.innerHTML = "<tr><td colspan='5'>Memuat log activity...</td></tr>";
+        tbody.innerHTML = "<tr><td colspan='8'>Memuat log activity...</td></tr>";
 
         try {
           const res = await apiCall("getActivityLog");
@@ -1258,7 +1261,7 @@
           if (res.data.length === 0) {
             const row = tbody.insertRow();
             const cell = row.insertCell();
-            cell.colSpan = 5;
+            cell.colSpan = 8;
             cell.textContent = "Belum ada aktivitas tercatat.";
             return;
           }
@@ -1267,10 +1270,13 @@
             const row = tbody.insertRow();
             [
               entry.Tanggal,
-              entry.Kode || "-",
+              entry.User,
+              entry.Role,
               entry.Aksi,
+              entry.Kode || "-",
               entry.Jumlah ?? "-",
-              entry.user,
+              entry.Detail,
+              entry.Sumber,
             ].forEach((value) => {
               row.insertCell().textContent = value ?? "";
             });
@@ -1280,7 +1286,7 @@
           tbody.replaceChildren();
           const row = tbody.insertRow();
           const cell = row.insertCell();
-          cell.colSpan = 5;
+          cell.colSpan = 8;
           cell.textContent = error.message || "Gagal memuat log activity.";
         }
       }
