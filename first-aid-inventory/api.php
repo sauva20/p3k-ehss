@@ -15,7 +15,7 @@ require_once __DIR__ . '/config.php';
 $pdo->exec("
     CREATE TABLE IF NOT EXISTS activity_logs (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL,
         actor_name VARCHAR(100) NOT NULL,
         actor_role VARCHAR(50) NOT NULL,
         action VARCHAR(100) NOT NULL,
@@ -45,8 +45,8 @@ function logActivity(PDO $pdo, string $action, string $details, ?string $itemBox
     }
 
     $stmt = $pdo->prepare("
-        INSERT INTO activity_logs (actor_name, actor_role, action, item_box, quantity, details)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO activity_logs (created_at, actor_name, actor_role, action, item_box, quantity, details)
+        VALUES (NOW(), ?, ?, ?, ?, ?, ?)
     ");
     $stmt->execute([
         $_SESSION['username'],
@@ -232,7 +232,7 @@ switch ($action) {
         }
 
         try {
-            $stmt = $pdo->prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)");
+            $stmt = $pdo->prepare("INSERT INTO users (username, password, role, created_at) VALUES (?, ?, ?, NOW())");
             $stmt->execute([$newUsername, password_hash($newPassword, PASSWORD_DEFAULT), $newRole]);
         } catch (PDOException $error) {
             if ($error->getCode() === '23000') {
@@ -346,11 +346,11 @@ switch ($action) {
         }
 
         // Simpan stok baru
-        $upStmt = $pdo->prepare("UPDATE barang SET stok = ? WHERE id = ?");
+        $upStmt = $pdo->prepare("UPDATE barang SET stok = ?, updated_at = NOW() WHERE id = ?");
         $upStmt->execute([$stokSekarang, $id]);
 
         // Catat riwayat log transaksi
-        $logStmt = $pdo->prepare("INSERT INTO transaksi (tanggal, kotak, aksi, jumlah, user) VALUES (NOW(), ?, ?, ?, ?)");
+        $logStmt = $pdo->prepare("INSERT INTO transaksi (tanggal, created_at, kotak, aksi, jumlah, user) VALUES (NOW(), NOW(), ?, ?, ?, ?)");
         $logStmt->execute([$item['kotak'], $aksi, $jumlah, $user]);
         logActivity(
             $pdo,
@@ -377,7 +377,7 @@ switch ($action) {
             exit;
         }
 
-        $stmt = $pdo->prepare("INSERT INTO barang (kotak, nama, standar, stok, pic, lokasi) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt = $pdo->prepare("INSERT INTO barang (kotak, nama, standar, stok, pic, lokasi, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())");
         $stmt->execute([$kotak, $nama, $standar, $stok, $pic, $lokasi]);
         logActivity(
             $pdo,
@@ -411,7 +411,7 @@ switch ($action) {
             exit;
         }
 
-        $stmt = $pdo->prepare("UPDATE barang SET kotak = ?, nama = ?, stok = ?, pic = ?, lokasi = ? WHERE id = ?");
+        $stmt = $pdo->prepare("UPDATE barang SET kotak = ?, nama = ?, stok = ?, pic = ?, lokasi = ?, updated_at = NOW() WHERE id = ?");
         $stmt->execute([$kotak, $nama, $stok, $pic, $lokasi, $id]);
         logActivity(
             $pdo,
@@ -467,7 +467,8 @@ switch ($action) {
                 kotak = REPLACE(kotak, ?, ?),
                 nama = REPLACE(nama, ?, ?),
                 pic = REPLACE(pic, ?, ?),
-                lokasi = REPLACE(lokasi, ?, ?)
+                lokasi = REPLACE(lokasi, ?, ?),
+                updated_at = NOW()
             WHERE 
                 kotak LIKE ? OR 
                 nama LIKE ? OR 
